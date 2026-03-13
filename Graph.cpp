@@ -122,11 +122,9 @@ void Graph::updateConnection(int v, int u, double w) {
         exit(1);
     }
 
-    Connection c;
-    c.weight = w;
-    c.delta = 0;
+    Connection c(v,u,w);
     
-    adjacencyList.at(v).insert({u, c});
+    adjacencyList.at(v)[u]=c;
 }
 
 // STUDENT TODO: IMPLEMENT

@@ -91,7 +91,19 @@ vector<double> NeuralNetwork::predict(DataInstance instance) {
         int curr = q.front();
         q.pop();
 
-        visitPredictNode(curr); 
+        bool isInput = false;
+        for (int i = 0; i < int(inputNodeIds.size()); i++) {
+            if (inputNodeIds.at(i) == curr) {
+                isInput = true;
+                break;
+            }
+        }
+
+        // Only activate if it is NOT an input node
+        if (!isInput) {
+            visitPredictNode(curr);
+        }
+
 
         for (auto&pair : adjacencyList.at(curr)) {
             int neighbor=pair.first;
