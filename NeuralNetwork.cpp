@@ -3,43 +3,49 @@
 #include "Trace.hpp"
 using namespace std;
 
-
+#include <map>
 
 // NeuralNetwork -----------------------------------------------------------------------------------------------------------------------------------
 
 // STUDENT TODO: IMPLEMENT
 void NeuralNetwork::eval() {
+    evaluating=true;
     //stub
 }
 
 // STUDENT TODO: IMPLEMENT
 void NeuralNetwork::train() {
+    evaluating=false;
     //stub
 }
 
 // STUDENT TODO: IMPLEMENT
 void NeuralNetwork::setLearningRate(double lr) {
+    learningRate=lr;
     //stub
 }
 
 // STUDENT TODO: IMPLEMENT
 void NeuralNetwork::setInputNodeIds(std::vector<int> inputNodeIds) {
+    this->inputNodeIds=inputNodeIds;
     //stub
 }
 
 // STUDENT TODO: IMPLEMENT
 void NeuralNetwork::setOutputNodeIds(std::vector<int> outputNodeIds) {
+    this->outputNodeIds=outputNodeIds;
     //stub
 }
 
 // STUDENT TODO: IMPLEMENT
 vector<int> NeuralNetwork::getInputNodeIds() const {
-    return vector<int>(); //stub
+
+    return inputNodeIds; //stub
 }
 
 // STUDENT TODO: IMPLEMENT
 vector<int> NeuralNetwork::getOutputNodeIds() const {
-    return vector<int>(); //stub
+    return outputNodeIds; //stub
 }
 
 // STUDENT TODO: IMPLEMENT
@@ -62,6 +68,43 @@ vector<double> NeuralNetwork::predict(DataInstance instance) {
     // Use visitPredictNode and visitPredictNeighbor to handle the neural network math
     // at each step of your traversal.
 
+    map<int, int> inDegrees;
+    for (int i = 0; i < int(nodes.size()); i++) {
+        if (nodes.at(i) == nullptr) continue;
+        for (auto&pair : adjacencyList.at(i)) {
+            int neighbor=pair.first;
+            inDegrees[neighbor]++;
+        }
+    }
+
+    queue<int> q;
+    
+    
+    for (int i = 0; i < int(inputNodeIds.size()); i++) {
+        int inNode = inputNodeIds.at(i);
+        nodes.at(inNode)->postActivationValue = input.at(i);
+        q.push(inNode);
+    }
+
+    
+    while (!q.empty()) {
+        int curr = q.front();
+        q.pop();
+
+        visitPredictNode(curr); 
+
+        for (auto&pair : adjacencyList.at(curr)) {
+            int neighbor=pair.first;
+            Connection c=pair.second;
+            visitPredictNeighbor(c);
+            
+            inDegrees[neighbor]--; 
+            if (inDegrees[neighbor] == 0) {
+                q.push(neighbor);
+            }
+        }
+    }
+
     vector<double> output;
     for (int i = 0; i < outputNodeIds.size(); i++) {
         int dest = outputNodeIds.at(i);
@@ -71,16 +114,21 @@ vector<double> NeuralNetwork::predict(DataInstance instance) {
 
     if (evaluating) {
         flush();
-    } else {
-        // increment batch size
+    } 
+    else {
         batchSize++;
-        // accumulate derivatives. If in training mode, weights and biases get accumulated
         contribute(instance.y, output.at(0));
     }
     return output;
 }
+
+
+
+
 // STUDENT TODO: IMPLEMENT
 bool NeuralNetwork::contribute(double y, double p) {
+
+
 
     // DFT implementation goes here.
     // This function initiates the recursion by calling the recursive helper
@@ -90,15 +138,23 @@ bool NeuralNetwork::contribute(double y, double p) {
     // The contributions map acts as your "visited" set and also stores each node's
     // computed contribution so it is not recomputed if reached by multiple paths.
 
+    for (int i = 0; i < int(inputNodeIds.size()); i++) {
+        contribute(inputNodeIds.at(i), y, p);
+    }
+
 
     flush();
 
     return true;
 }
 // STUDENT TODO: IMPLEMENT
+
 double NeuralNetwork::contribute(int nodeId, const double& y, const double& p) {
     visitContributeStart(nodeId); // don't remove this line, used for visualization
     // incomingContribution: the error signal returned by a recursive call on a neighbor.
+    if (contributions.find(nodeId) != contributions.end()) {
+        return contributions.at(nodeId);
+    }
     double incomingContribution = 0;
     // outgoingContribution: built up from this node's neighbors, then scaled by
     // this node's activation derivative before being returned to the previous layer.
@@ -114,6 +170,35 @@ double NeuralNetwork::contribute(int nodeId, const double& y, const double& p) {
         outgoingContribution = -1 * ((y - p) / (p * (1 - p)));
     }
 
+    else {
+        // Recursive case dive deeper into neighbors
+        for (auto&pair : adjacencyList.at(nodeId)) {
+            int neighbor=pair.first;
+            Connection &c=pair.second;
+
+            incomingContribution = contribute(neighbor,y,p);
+            visitContributeNeighbor(c,incomingContribution,outgoingContribution);
+        }
+        // Scale the accumulated error by this node's derivative
+        outgoingContribution = outgoingContribution * currNode->activationDerivative(currNode->postActivationValue);
+    }
+
+    bool isInput = false;
+    for (int i = 0; i < int(inputNodeIds.size()); i++) {
+        if (inputNodeIds.at(i) == nodeId) {
+            isInput = true;
+            break;
+        }
+    }
+    
+    if (!isInput) {
+        visitContributeNode(nodeId,outgoingContribution);
+    }
+
+    // Store in the map before returning
+    contributions[nodeId] = outgoingContribution;
+
+
     // Before returning, store outgoingContribution in the contributions map.
 
     return outgoingContribution;
@@ -126,6 +211,22 @@ bool NeuralNetwork::update() {
     // Each node has a delta term 
     // Each connection has a delta term
 
+    for (int i = 0; i < int(nodes.size()); i++) {
+        NodeInfo* node = nodes.at(i);
+        if (node == nullptr) continue;
+
+        // Bias update formula
+        node->bias = node->bias - (learningRate * node->delta);
+        node->delta = 0; // Reset
+
+        // Traverse every connection for this node
+        for (auto &pair:adjacencyList.at(i)) {
+
+            Connection&c=pair.second;
+            c.weight=c.weight-(learningRate*c.delta);
+            c.delta=0;
+        }
+    }
     // use the formulas for each update
     // bias update: bias = bias - (learningRate * delta)
     // weight update: weight = weight - (learningRate * delta)
