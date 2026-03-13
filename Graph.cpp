@@ -112,16 +112,21 @@ NodeInfo* Graph::getNode(int id) const {
 
 // STUDENT TODO: IMPLEMENT
 void Graph::updateConnection(int v, int u, double w) {
-    if (/* v is out of bounds — check if v is a valid index into nodes */ v<0||v>=int(nodes.size())||nodes[v]==nullptr) {
+    if (v < 0 || v >= int(nodes.size()) || nodes[v] == nullptr) {
         cerr << "Attempting to update connection between " << v << " and " << u << " with weight " << w << " but " << v << " does not exist" << endl;
         exit(1);
     }
-    if (/* u is out of bounds — check if u is a valid index into nodes */ u<0||u>=int{nodes.size()}||nodes[u]==nullptr) {
+    
+    if (u < 0 || u >= int(nodes.size()) || nodes[u] == nullptr) {
         cerr << "Attempting to update connection between " << v << " and " << u << " with weight " << w << " but " << u << " does not exist" << endl;
         exit(1);
     }
 
-    nodes[v]->connections.push_back({u,w});
+    Connection c;
+    c.weight = w;
+    c.delta = 0;
+    
+    adjacencyList.at(v).insert({u, c});
 }
 
 // STUDENT TODO: IMPLEMENT
